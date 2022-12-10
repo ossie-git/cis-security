@@ -14,7 +14,7 @@
   # Let the user know what version of the controls file is running
   # Use a variable so it prints out the correct version.
   - name: Print Header
-  - ansible.builtin.debug: msg="CIS Controls for {{ ansible_distribution }} {{ ansible_distribution_major_version }}"
+    ansible.builtin.debug: msg="CIS Controls for {{ ansible_distribution }} {{ ansible_distribution_major_version }}"
 
   # Collect the packages installed on the system so we can check agains them later
   - name: Collect package list
@@ -163,6 +163,7 @@
           owner: root
           group: root
           state: link
+          force: yes
         notify: restart tmpfs
 
     tags:
@@ -975,10 +976,10 @@
   - name: 2.2.2 - disable display manager if graphical desktop not needed
     block:
     # Find the current default run level. The systemctl module does not handle the
-    #  get-default routine, so we are looking at the target of the symlink at /etc/systemd/system/default.target
+    #  get-default routine, so we are looking at the target of the symlink at /usr/lib/systemd/system/default.target
     - name: 2.2.2 - get default runlevel
       ansible.builtin.stat:
-        path: /etc/systemd/system/default.target
+        path: /usr/lib/systemd/system/default.target
       register: default_runlevel_out
       tags:
         - 2.2.2
@@ -990,14 +991,18 @@
         enabled: false
         masked: true
         state: stopped
+      register: service_command_output
+      failed_when:
+        - service_command_output.msg is search('Could not find the requested service')
+        - service_command_output.status is defined and service_command_output.status is search('is masked')
       when: default_runlevel_out.stat.lnk_target is search("graphical.target") and not graphical_interface
       tags:
         - 2.2.2
 
     # Set the current run level. The systemctl module does not handle the
-    #  get-default routine, so we are looking at the target of the symlink at /etc/systemd/system/default.target
+    #  get-default routine, so we are looking at the target of the symlink at /usr/lib/systemd/system/default.target
     - name: 2.2.2 - Set current runlevel (non graphical)
-      ansible.builtin.command: /bin/systemctl isolate multi-user.target
+      ansible.builtin.command: /usr/bin/systemctl isolate multi-user.target
       register: isolate_out
       changed_when: isolate_out.changed
       when: default_runlevel_out.stat.lnk_target is search("graphical.target") and not graphical_interface
@@ -1005,7 +1010,7 @@
         - 2.2.2
 
     - name: 2.2.2 - Set current runlevel (graphical)
-      ansible.builtin.command: /bin/systemctl isolate graphical.target
+      ansible.builtin.command: /usr/bin/systemctl isolate graphical.target
       register: isolate_out
       changed_when: isolate_out.changed
       when: default_runlevel_out.stat.lnk_target is search("multi-user.target") and not graphical_interface
@@ -1016,7 +1021,7 @@
     - name: 2.2.2 - Set default runlevel (non graphical)
       ansible.builtin.file:
         src: /lib/systemd/system/multi-user.target
-        dest: /etc/systemd/system/default.target
+        dest: /usr/lib/systemd/system/default.target
         owner: root
         group: root
       when: not graphical_interface
@@ -1024,7 +1029,7 @@
     - name: 2.2.2 - Set default runlevel (graphical)
       ansible.builtin.file:
         src: /lib/systemd/system/graphical.target
-        dest: /etc/systemd/system/default.target
+        dest: /usr/lib/systemd/system/default.target
         owner: root
         group: root
       when: graphical_interface
