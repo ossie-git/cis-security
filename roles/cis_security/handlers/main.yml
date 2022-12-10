@@ -66,6 +66,10 @@
     enabled: True
     masked: False
     daemon_reload: True
+  register: service_command_output
+  failed_when:
+    - service_command_output.msg is search('Could not find the requested service')
+    - service_command_output.status is defined and service_command_output.status is search('is masked')
 
 # Call the grub config file rebuilding program
 # There is no grub module, so we have to do it with shell
